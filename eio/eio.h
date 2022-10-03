@@ -25,7 +25,7 @@ extern "C" {
 #include <stdint.h>
 
 /* config ------------------------------------------------------------------- */
-#define EIO_EVENT_MODE                  (0)             /* 0: Event, 1: Callback */
+#define EIO_EVENT_MODE                  (1)             /* 0: Event, 1: Callback */
 #define EIO_ENABLE_ASSERT               (1)
 
 /* At the MCU starting time, the eio polling is disabled. */
@@ -42,6 +42,8 @@ extern "C" {
 #endif
 
 /* public define ------------------------------------------------------------ */
+#define EIO_MAGIC_NUMBER                (0xdeadbeef)
+
 enum
 {
     EIO_RT_LEVEL_MS = 0,
@@ -56,7 +58,7 @@ enum eio_type
     EIO_TYPE_AIN,
     EIO_TYPE_AOUT,
     EIO_TYPE_PWM,
-    EIO_TYPE_UART,
+    EIO_TYPE_SERIAL,
     EIO_TYPE_CAN,
     EIO_TYPE_SPI,
     EIO_TYPE_I2C,
@@ -89,6 +91,12 @@ typedef enum eio_err_tag
 /* public typedef ----------------------------------------------------------- */
 struct eio_obj;
 typedef void (* eio_callback_t)(struct eio_obj *const me);
+
+typedef struct eio_time
+{
+    uint32_t ms;
+    uint16_t us;
+} eio_time_t;
 
 typedef struct eio_obj_attribute
 {
@@ -136,7 +144,6 @@ struct eio_ops
                         uint32_t pos, void *buff, uint32_t size);
     int32_t (* write)(eio_obj_t * const me,
                         uint32_t pos, const void *buff, uint32_t size);
-    //eio_err_t (* control)(eio_obj_t * const me, uint8_t cmd, const void *data);
     void (* poll)(eio_obj_t *me);
 };
 
@@ -144,9 +151,6 @@ struct eio_ops
 /* EIO basic functions. */
 void eio_poll(uint8_t rt_level);
 eio_obj_t *eio_find(const char *name);
-void eio_register(eio_obj_t * const me,
-                    const char *name,
-                    eio_obj_attribute_t *attribute);
 
 /* Event related functions. */
 void eio_attach_event(eio_obj_t * const me, eio_event_t *e);
@@ -165,10 +169,14 @@ eio_err_t eio_open(eio_obj_t * const me);
 eio_err_t eio_close(eio_obj_t * const me);
 int32_t eio_read(eio_obj_t *me, uint32_t pos, void *buff, uint32_t size);
 int32_t eio_write(eio_obj_t *me, uint32_t pos, const void *buff, uint32_t size);
-eio_err_t eio_control(eio_obj_t *me, uint8_t cmd, const void *data);
+
+/* EIO general functions. */
+void eio_get_time(eio_time_t *time);
+uint32_t eio_time_diff_ms(eio_time_t *time_current, eio_time_t *time_last);
+uint32_t eio_time_diff_us(eio_time_t *time_current, eio_time_t *time_last);
 
 /* public port function ----------------------------------------------------- */
-uint32_t eio_port_get_time(void);
+uint32_t eio_port_system_time(void);
 void eio_port_rt_isr_enable(uint8_t rt_level, bool enable);
 void *eio_port_malloc(uint32_t size);
 void eio_port_free(void *memory);

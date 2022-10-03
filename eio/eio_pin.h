@@ -1,27 +1,48 @@
+/*
+ * PIN, EventOS Input & Output Framework
+ * Copyright (c) 2022, EventOS Team, <event-os@outlook.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * https://www.event-os.cn
+ * https://github.com/event-os/eventos
+ * https://gitee.com/event-os/eventos
+ * 
+ * Change Logs:
+ * Date           Author        Notes
+ * 2022-10-02     Dog           the first version
+ */
 
-#ifndef __DEV_SWITCH_H__
-#define __DEV_SWITCH_H__
+#ifndef __EIO_PIN_H__
+#define __EIO_PIN_H__
 
-// include ---------------------------------------------------------------------
+/* include ------------------------------------------------------------------ */
 #include "eio.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// enum ------------------------------------------------------------------------
+/* public define ------------------------------------------------------------ */
 enum
 {
-    PIN_MODE_OUT_OD = 0,
-    PIN_MODE_OUT_PP,
-    PIN_MODE_IN,
-    PIN_MODE_IN_PULLUP,
-    PIN_MODE_IN_PULLDOWN,
+    EIO_PIN_MODE_OUT_OD = 0,
+    EIO_PIN_MODE_OUT_PP,
+    EIO_PIN_MODE_IN,
+    EIO_PIN_MODE_IN_PULLUP,
+    EIO_PIN_MODE_IN_PULLDOWN,
 
-    PIN_MODE_MAX
+    EIO_PIN_MODE_MAX
 };
 
-// data struct -----------------------------------------------------------------
+/* public typedef ----------------------------------------------------------- */
+typedef struct eio_pin_attribute
+{
+    void *user_data;
+    uint8_t mode;
+    uint8_t status_default;
+} eio_pin_attribute_t;
+
 typedef struct eio_pin_tag
 {
     eio_obj_t super;
@@ -33,20 +54,26 @@ typedef struct eio_pin_tag
 
 struct eio_pin_ops
 {
-    void (* set_status)(eio_pin_t *me, bool status);
-    bool (* get_status)(eio_pin_t *me);
+    void (* set_mode)(eio_pin_t * const me, uint8_t mode);
+    void (* set_status)(eio_pin_t * const me, bool status);
+    bool (* get_status)(eio_pin_t * const me);
 };
 
-// api -------------------------------------------------------------------------
-eio_err_t eio_pin_register(eio_pin_t *me, const char *name, void *user_data);
-void eio_pin_set_mode(eio_obj_t *me, uint8_t mode);
-bool eio_pin_get_status(eio_obj_t *me);
-void eio_pin_set_status(eio_obj_t *me, bool status);
+/* public function ---------------------------------------------------------- */
+/* For the driver layer. */
+eio_err_t eio_pin_register(eio_pin_t * const me,
+                            const char *name,
+                            eio_pin_attribute_t *attribute);
+
+/* For the upper layers. */
+void eio_pin_set_mode(eio_obj_t * const me, uint8_t mode);
+bool eio_pin_get_status(eio_obj_t * const me);
+void eio_pin_set_status(eio_obj_t * const me, bool status);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* __EIO_PIN_H__ */
 
-// Note ------------------------------------------------------------------------
+/* ----------------------------- end of file -------------------------------- */

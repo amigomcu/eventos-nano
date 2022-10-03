@@ -25,16 +25,13 @@
 extern "C" {
 #endif
 
-/* private define ----------------------------------------------------------- */
-#define EIO_MAGIC_NUMBER                (0xdeadbeef)
-
 /* private typedef ---------------------------------------------------------- */
 static eio_obj_t *list[EIO_RT_LEVEL_MAX] =
 {
     NULL, NULL,
 };
 static uint32_t time_eio_ms = UINT32_MAX;
-static uint32_t time_eio_us = UINT16_MAX;
+static uint16_t time_eio_us = UINT16_MAX;
 
 /* public function ---------------------------------------------------------- */
 void eio_poll(uint8_t rt_level)
@@ -45,14 +42,14 @@ void eio_poll(uint8_t rt_level)
     /* Get the time for the 1st time. */
     if (time_eio_ms == UINT32_MAX)
     {
-        time_eio_ms = eio_port_get_time();
+        time_eio_ms = eio_port_system_time();
         return;
     }
 
     /* Time adjusting, and clear us-level time counting. */
     if (rt_level == EIO_RT_LEVEL_US && time_eio_us == UINT16_MAX)
     {
-        if (time_eio_ms != eio_port_get_time())
+        if (time_eio_ms != eio_port_system_time())
         {
             time_eio_us = 0;
         }
@@ -65,7 +62,7 @@ void eio_poll(uint8_t rt_level)
     /* The non-realtime polling is executed while time_ms changes. */
     /* The beginning section of time is ignored. */
     if (rt_level == EIO_RT_LEVEL_MS &&
-        (time_eio_ms == eio_port_get_time()) ||
+        (time_eio_ms == eio_port_system_time()) ||
         (time_eio_ms <= EIO_TIME_START_IGNORE))
     {
         return;
@@ -80,13 +77,14 @@ void eio_poll(uint8_t rt_level)
 
         if (obj->enabled && obj->ops->poll != NULL)
         {
-            uint32_t time = eio_port_get_time();
+            uint32_t time = eio_port_system_time();
             while (time >= obj->time_next)
             {
                 obj->time_next += obj->attribute.period;
-                obj->ops->isr_enable(obj, false);
-                obj->ops->poll(obj);
-                obj->ops->isr_enable(obj, true);
+                if (obj->ops != NULL && obj->ops->poll != NULL)
+                {
+                    obj->ops->poll(obj);
+                }
             }
         }
 
@@ -156,20 +154,16 @@ void eio_attach_event(eio_obj_t * const me, eio_event_t *e)
 {
     /* Check the parameters are valid. */
     EIO_ASSERT(me != NULL);
-    EIO_ASSERT(e != NULL);
+    EIO_ASSERT_NAME(e != NULL, me->name);
 
     /* Disable the interrupt of the polling timer ISR. */
     eio_port_rt_isr_enable(me->attribute.rt_level, false);
-    if (me->ops != NULL && me->ops->isr_enable != NULL)
-    {
-        me->ops->isr_enable(me, false);
-    }
 
     /* Check the event ID is existent in the list. */
     eio_event_t *evt = me->elist;
     while (evt != NULL)
     {
-        EIO_ASSERT(evt->eio_event_id != e->eio_event_id);
+        EIO_ASSERT_NAME(evt->eio_event_id != e->eio_event_id);
         evt = evt->next;
     }
 
@@ -198,7 +192,7 @@ void eio_event_publish(eio_obj_t * const me, uint8_t eio_event_id)
 #if (EIO_EVENT_MODE == 0)
             eos_event_pub_topic(evt->e_topic);
 #else
-            EIO_ASSERT(evt->callback != NULL);
+            EIO_ASSERT_NAME(evt->callback != NULL);
             evt->callback(me);
 #endif
             break;
@@ -219,10 +213,6 @@ void eio_event_set_topic(eio_obj_t * const me,
 
     /* Disable the interrupt of the polling timer ISR. */
     eio_port_rt_isr_enable(me->attribute.rt_level, false);
-    if (me->ops != NULL && me->ops->isr_enable != NULL)
-    {
-        me->ops->isr_enable(me, false);
-    }
 
     /* Check the event ID is existent in the list. */
     eio_event_t *evt = me->elist;
@@ -238,10 +228,6 @@ void eio_event_set_topic(eio_obj_t * const me,
 
     /* Enable the interrupt of the polling timer ISR. */
     eio_port_rt_isr_enable(me->attribute.rt_level, true);
-    if (me->ops != NULL && me->ops->isr_enable != NULL)
-    {
-        me->ops->isr_enable(me, true);
-    }
 }
 #else
 void eio_event_set_callback(eio_obj_t * const me,
@@ -254,10 +240,6 @@ void eio_event_set_callback(eio_obj_t * const me,
 
     /* Disable the interrupt of the polling timer ISR. */
     eio_port_rt_isr_enable(me->attribute.rt_level, false);
-    if (me->ops != NULL && me->ops->isr_enable != NULL)
-    {
-        me->ops->isr_enable(me, false);
-    }
 
     /* Check the event ID is existent in the list. */
     eio_event_t *evt = me->elist;
@@ -273,10 +255,6 @@ void eio_event_set_callback(eio_obj_t * const me,
 
     /* Enable the interrupt of the polling timer ISR. */
     eio_port_rt_isr_enable(me->attribute.rt_level, true);
-    if (me->ops != NULL && me->ops->isr_enable != NULL)
-    {
-        me->ops->isr_enable(me, true);
-    }
 }
 #endif
 
@@ -284,25 +262,15 @@ eio_err_t eio_open(eio_obj_t * const me)
 {
     /* Check the parameters are valid. */
     EIO_ASSERT(me != NULL);
-    EIO_ASSERT(me->ops != NULL);
-    EIO_ASSERT(me->ops->open != NULL);
 
     eio_err_t ret = EIO_OK;
 
     if (me->enabled == false)
     {
-        if (me->ops->isr_enable != NULL)
-        {
-            me->ops->isr_enable(me, false);
-        }
-        
+        EIO_ASSERT_NAME(me->ops != NULL, me->name);
+        EIO_ASSERT_NAME(me->ops->open != NULL, me->name);
         me->enabled = true;
         ret = me->ops->open(me);
-
-        if (me->ops->isr_enable != NULL)
-        {
-            me->ops->isr_enable(me, true);
-        }
     }
 
     return ret;
@@ -312,25 +280,15 @@ eio_err_t eio_close(eio_obj_t * const me)
 {
     /* Check the parameters are valid. */
     EIO_ASSERT(me != NULL);
-    EIO_ASSERT(me->ops != NULL);
-    EIO_ASSERT(me->ops->close != NULL);
 
     eio_err_t ret = EIO_OK;
 
     if (me->enabled == true)
     {
-        if (me->ops->isr_enable != NULL)
-        {
-            me->ops->isr_enable(me, false);
-        }
-
+        EIO_ASSERT_NAME(me->ops != NULL, me->name);
+        EIO_ASSERT_NAME(me->ops->close != NULL, me->name);
         me->enabled = false;
         ret = me->ops->close(false);
-
-        if (me->ops->isr_enable != NULL)
-        {
-            me->ops->isr_enable(me, true);
-        }
     }
 
     return ret;
@@ -349,8 +307,8 @@ int32_t eio_read(eio_obj_t *me, uint32_t pos, void *buff, uint32_t size)
     }
     else
     {
-        EIO_ASSERT(me->ops != NULL);
-        EIO_ASSERT(me->ops->read != NULL);
+        EIO_ASSERT_NAME(me->ops != NULL, me->name);
+        EIO_ASSERT_NAME(me->ops->read != NULL, me->name);
         ret = me->ops->read(me, pos, buff, size);
     }
 
@@ -370,30 +328,34 @@ int32_t eio_write(eio_obj_t *me, uint32_t pos, const void *buff, uint32_t size)
     }
     else
     {
-        EIO_ASSERT(me->ops != NULL);
-        EIO_ASSERT(me->ops->write != NULL);
+        EIO_ASSERT_NAME(me->ops != NULL, me->name);
+        EIO_ASSERT_NAME(me->ops->write != NULL, me->name);
         ret = me->ops->write(me, pos, buff, size);
     }
 
     return ret;
 }
 
-eio_err_t eio_control(eio_obj_t *me, uint8_t cmd, const void *data)
+void eio_get_time(eio_time_t *time)
 {
-    int32_t ret = EIO_OK;
+    time->ms = time_eio_ms;
+    time->us = time_eio_us;
+}
 
-    if (me->enabled == false)
-    {
-        ret = EIO_ERR_DISABLED;
-    }
-    else
-    {
-        EIO_ASSERT(me->ops != NULL);
-        EIO_ASSERT(me->ops->control != NULL);
-        ret = me->ops->control(me, cmd, data);
-    }
+uint32_t eio_time_diff_ms(eio_time_t *time_current, eio_time_t *time_last)
+{
+    uint64_t _time_current = time_current->ms * 1000 + time_current->us;
+    uint64_t _time_last = time_last->ms * 1000 + time_last->us;
 
-    return ret;
+    return (uint32_t)((_time_current - _time_last) / 1000);
+}
+
+uint32_t eio_time_diff_us(eio_time_t *time_current, eio_time_t *time_last)
+{
+    uint64_t _time_current = time_current->ms * 1000 + time_current->us;
+    uint64_t _time_last = time_last->ms * 1000 + time_last->us;
+
+    return (uint32_t)((_time_current - _time_last));
 }
 
 #ifdef __cplusplus
