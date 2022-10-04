@@ -1,5 +1,5 @@
 /*
- * Serial Port, EventOS Input & Output Framework
+ * Serial port, EventOS Input & Output Framework
  * Copyright (c) 2022, EventOS Team, <event-os@outlook.com>
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -21,11 +21,6 @@
 extern "C" {
 #endif
 
-/* private define ----------------------------------------------------------- */
-
-
-/* private typedef ---------------------------------------------------------- */
-
 /* private function prototype ----------------------------------------------- */
 /* Interface functions. */
 static eio_err_t _serial_open(eio_obj_t * const me);
@@ -33,8 +28,8 @@ static eio_err_t _serial_close(eio_obj_t * const me);
 static void _serial_poll(eio_obj_t * const me);
 
 /* static function related with buffer. */
-static uint16_t _buff_remaining(eio_serial_buff_t *buff);
-static bool _buff_empty(eio_serial_buff_t *buff);
+static uint16_t _buff_remaining(eio_serial_buff_t * const buff);
+static bool _buff_empty(eio_serial_buff_t * const buff);
 
 /* static function related with threshold for T1.5 and T3.5. */
 static void _set_threshold_t15_t35(eio_serial_t * const me,
@@ -58,7 +53,7 @@ static const struct eio_ops serial_ops =
 
 static eio_obj_attribute_t serial_obj_attribute =
 {
-    100, EIO_TYPE_SERIAL, EIO_RT_LEVEL_US, NULL
+    100, EIO_TYPE_SERIAL, EIO_RT_LEVEL_100US, NULL
 };
 
 /* public function ---------------------------------------------------------- */
@@ -72,6 +67,7 @@ eio_err_t eio_serial_register(eio_serial_t * const me,
     EIO_ASSERT_NAME(attribute != NULL, name);
     EIO_ASSERT_NAME(me->ops != NULL, name);
     EIO_ASSERT_NAME(me->ops->config != NULL, name);
+    EIO_ASSERT_NAME(me->ops->isr_enable != NULL, name);
 
     /* Set the serial port attribute. */
     /* buffer tx */
@@ -90,6 +86,9 @@ eio_err_t eio_serial_register(eio_serial_t * const me,
 
     /* Configure serial port as default and disable the ISR. */
     me->ops->config(me, &(eio_serial_config_t)EIO_SERIAL_CONFIG_DEFAULT);
+    memcpy(&me->config,
+            &(eio_serial_config_t)EIO_SERIAL_CONFIG_DEFAULT,
+            sizeof(eio_serial_config_t));
     me->ops->isr_enable(me, false);
 
     /* Calculate the bits threshold of T3.5 and T1.5. */
@@ -109,8 +108,8 @@ void eio_serial_isr_receive(eio_serial_t * const me, uint8_t byte)
 {
     /* Check the parameters are valid or not. */
     EIO_ASSERT(me != NULL);
-    EIO_ASSERT_NAME(me->ops != NULL);
-    EIO_ASSERT_NAME(me->ops->isr_enable != NULL);
+    EIO_ASSERT_NAME(me->ops != NULL, me->super.name);
+    EIO_ASSERT_NAME(me->ops->isr_enable != NULL, me->super.name);
 
     /* When serial is RS232, or when serial is RS485 and not sending, */
     if (!(me->rs485 && me->sending))
@@ -176,16 +175,21 @@ void eio_serial_config(eio_obj_t * const me, eio_serial_config_t *config)
     EIO_ASSERT(me != NULL);
     EIO_ASSERT_NAME(config != NULL, me->name);
 
-    /* serial type cast. */
+    /* Serial type cast. */
     eio_serial_t *serial = (eio_serial_t *)me;
     EIO_ASSERT_NAME(serial->ops != NULL, me->name);
     EIO_ASSERT_NAME(serial->ops->config != NULL, me->name);
 
-    /* Configure the serial port. */
-    serial->ops->config(serial, config);
+    /* If configurations of serial port are changed, */
+    if (memcmp(config, &serial->config, sizeof(eio_serial_config_t)) != 0)
+    {
+        /* Configure the serial port. */
+        serial->ops->config(serial, config);
+        memcpy(&serial->config, config, sizeof(eio_serial_config_t));
 
-    /* Calculate the bits threshold of T3.5 and T1.5. */
-    _set_threshold_t15_t35(serial, config);
+        /* Calculate the bits threshold of T3.5 and T1.5. */
+        _set_threshold_t15_t35(serial, config);
+    }
 }
 
 int32_t eio_serial_write(eio_obj_t * const me, const void *buff, uint32_t size)
@@ -278,12 +282,12 @@ static void _set_threshold_t15_t35(eio_serial_t * const me,
     }
 }
 
-static uint16_t _buff_remaining(eio_serial_buff_t *buff)
+static uint16_t _buff_remaining(eio_serial_buff_t * const buff)
 {
     return 0;
 }
 
-static bool _buff_empty(eio_serial_buff_t *buff)
+static bool _buff_empty(eio_serial_buff_t * const buff)
 {
     return 0;
 }

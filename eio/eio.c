@@ -37,7 +37,7 @@ static uint16_t time_eio_us = UINT16_MAX;
 void eio_poll(uint8_t rt_level)
 {
     /* Check the parameters are valid. */
-    EIO_ASSERT(rt_level <= EIO_RT_LEVEL_US);
+    EIO_ASSERT(rt_level < EIO_RT_LEVEL_MAX);
 
     /* Get the time for the 1st time. */
     if (time_eio_ms == UINT32_MAX)

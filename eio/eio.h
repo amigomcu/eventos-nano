@@ -46,8 +46,10 @@ extern "C" {
 
 enum
 {
-    EIO_RT_LEVEL_MS = 0,
-    EIO_RT_LEVEL_US,
+    EIO_RT_LEVEL_SUPERLOOP = 0,
+    EIO_RT_LEVEL_MS,
+    EIO_RT_LEVEL_100US,
+    EIO_RT_LEVEL_10US,
 
     EIO_RT_LEVEL_MAX
 };
@@ -56,6 +58,7 @@ enum eio_type
 {
     EIO_TYPE_PIN = 0,
     EIO_TYPE_SERIAL,
+    EIO_TYPE_RTC,
     EIO_TYPE_AIN,
     EIO_TYPE_AOUT,
     EIO_TYPE_PWM,
@@ -63,7 +66,7 @@ enum eio_type
     EIO_TYPE_SPI,
     EIO_TYPE_I2C,
     EIO_TYPE_SIMU_UART,                 /* Simulated uart */
-    EIO_TYPE_SIMU_I2C,                  /* Simulated uart */
+    EIO_TYPE_SIMU_I2C,                  /* Simulated I2C */
     EIO_TYPE_EEPROM,
     EIO_TYPE_FLASH,
     EIO_TYPE_1WIRE,

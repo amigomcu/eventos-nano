@@ -1,5 +1,5 @@
 /*
- * serial, EventOS Input & Output Framework
+ * Serial port, EventOS Input & Output Framework
  * Copyright (c) 2022, EventOS Team, <event-os@outlook.com>
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -89,6 +89,7 @@ typedef struct eio_serial
     eio_obj_t super;
 
     const struct io_serial_ops *ops;
+    eio_serial_config_t config;
     eio_serial_buff_t buff_tx;
     eio_serial_buff_t buff_rx;
     eio_time_t time_receive;

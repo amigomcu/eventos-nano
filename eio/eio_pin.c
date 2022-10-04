@@ -1,5 +1,5 @@
 /*
- * Serial Port, EventOS Input & Output Framework
+ * PIN, EventOS Input & Output Framework
  * Copyright (c) 2022, EventOS Team, <event-os@outlook.com>
  *
  * SPDX-License-Identifier: Apache-2.0

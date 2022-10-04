@@ -1,5 +1,5 @@
 /*
- * PIN, EventOS Input & Output Framework
+ * 1-Wire bus, EventOS Input & Output Framework
  * Copyright (c) 2022, EventOS Team, <event-os@outlook.com>
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -10,11 +10,11 @@
  * 
  * Change Logs:
  * Date           Author        Notes
- * 2022-10-02     Dog           the first version
+ * 2022-10-03     Dog           the first version
  */
 
-#ifndef __EIO_PIN_H__
-#define __EIO_PIN_H__
+#ifndef __EIO_1_WIRE_H__
+#define __EIO_1_WIRE_H__
 
 /* include ------------------------------------------------------------------ */
 #include "eio.h"
@@ -26,22 +26,27 @@ extern "C" {
 /* public define ------------------------------------------------------------ */
 enum
 {
-    EIO_PIN_MODE_OUT_OD = 0,
-    EIO_PIN_MODE_OUT_PP,
-    EIO_PIN_MODE_IN,
-    EIO_PIN_MODE_IN_PULLUP,
-    EIO_PIN_MODE_IN_PULLDOWN,
+    EIO_1WIRE_OK = 0,
+    EIO_1WIRE_ERROR,
+};
 
-    EIO_PIN_MODE_MAX
+enum
+{
+    EIO_1WIRE_PIN_MODE_OUT_OD = 0,
+    EIO_1WIRE_PIN_MODE_IN,
+
+    EIO_1WIRE_PIN_MODE_MAX
 };
 
 /* public typedef ----------------------------------------------------------- */
-typedef struct eio_pin_attribute
+typedef struct eio_1wire_attribute
 {
     void *user_data;
-    uint8_t mode;
-    uint8_t status_default;
-} eio_pin_attribute_t;
+    uint8_t *buff_send;
+    uint8_t *buff_receive;
+    uint8_t size_send;
+    uint8_t size_receice;
+} eio_1wire_attribute_t;
 
 typedef struct eio_pin_tag
 {
@@ -61,19 +66,20 @@ struct eio_pin_ops
 
 /* public function ---------------------------------------------------------- */
 /* For the driver layer. */
-eio_err_t eio_pin_register(eio_pin_t * const me,
-                            const char *name,
-                            eio_pin_attribute_t *attribute);
+eio_err_t eio_1wire_register(eio_pin_t * const me,
+                                const char *name,
+                                eio_1wire_attribute_t *attribute);
 
-/* For the upper layers. */
-void eio_pin_set_mode(eio_obj_t * const me, uint8_t mode);
-bool eio_pin_get_status(eio_obj_t * const me);
-void eio_pin_set_status(eio_obj_t * const me, bool status);
+/* For the upper layers */
+eio_err_t eio_1wire_reset(eio_pin_t * const me);
+eio_err_t eio_1wire_write(eio_pin_t * const me,
+                            uint8_t byte_send[], uint8_t size_send,
+                            uint8_t size_receive);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __EIO_PIN_H__ */
+#endif /* __EIO_1_WIRE_H__ */
 
 /* ----------------------------- end of file -------------------------------- */
