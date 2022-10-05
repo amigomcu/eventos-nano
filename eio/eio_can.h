@@ -107,6 +107,7 @@ typedef struct eio_can
     eio_can_buff_t buff_receive;
     eio_can_config_t config;
     eio_can_filter_t *filter_list;
+    bool sending;
 } eio_can_t;
 
 struct eio_can_ops
@@ -115,7 +116,7 @@ struct eio_can_ops
     eio_err_t (* config)(eio_can_t * const me, eio_can_config_t * config);
     void (* send)(eio_can_t * const me, const eio_can_msg_t *msg);
     bool (* send_busy)(eio_can_t * const me);
-    void (* config_filter)(eio_can_t * const me, eio_can_filter_t *filter);
+    eio_err_t (* config_filter)(eio_can_t * const me, eio_can_filter_t *filter);
 };
 
 /* public function ---------------------------------------------------------- */
@@ -130,7 +131,7 @@ void eio_can_isr_send_end(eio_can_t * const me);
 void eio_can_config(eio_obj_t * const me, eio_can_config_t *config);
 void eio_can_send(eio_obj_t * const me, const eio_can_msg_t *msg);
 bool eio_can_receive(eio_obj_t * const me, eio_can_msg_t *msg);
-void eio_can_config_filter(eio_obj_t * const me);
+eio_err_t eio_can_config_filter(eio_obj_t * const me, eio_can_filter_t *filter);
 
 #ifdef __cplusplus
 }

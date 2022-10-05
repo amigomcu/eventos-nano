@@ -103,32 +103,32 @@ typedef struct eio_time
 
 typedef struct eio_obj_attribute
 {
-    uint32_t period;
+    uint32_t period;                    /* Polling peroid. */
     uint8_t type;                       /* IO object type, see enum eio_type. */
     uint8_t rt_level;                   /* Realtime level, see enum eio_rt_level. */
-    void *user_data;
+    void *user_data;                    /* User data. */
 } eio_obj_attribute_t;
 
 typedef struct eio_event
 {
     struct eio_event *next;
 #if (EIO_EVENT_MODE == 0)
-    uint32_t e_topic;
+    uint32_t e_topic;                   /* The event topic. */
 #else
-    eio_callback_t callback;
+    eio_callback_t callback;            /* Callback function in callback mode. */
 #endif
-    uint8_t eio_event_id;
+    uint8_t eio_event_id;               /* Event ID, defined by EIO object. */
 } eio_event_t;
 
 typedef struct eio_obj
 {
-    uint32_t magic;
+    uint32_t magic;                     /* Magic number. */
 
     /* public */
     struct eio_obj *next;
-    eio_event_t *elist;
-    const char *name;
-    eio_obj_attribute_t attribute;
+    eio_event_t *elist;                 /* Event list. */
+    const char *name;                   /* Object name. */
+    eio_obj_attribute_t attribute;      /* attribute. */
 
     /* private */
     uint32_t time_next;                 /* The time for polling next time. */
@@ -136,7 +136,7 @@ typedef struct eio_obj
     bool enabled;
 
     /* interface */
-    struct eio_ops *ops;
+    struct eio_ops *ops;                /* EIO ops interface. */
 } eio_obj_t;
 
 struct eio_ops

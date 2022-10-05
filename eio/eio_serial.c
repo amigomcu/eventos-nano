@@ -158,8 +158,8 @@ void eio_serial_isr_send_end(eio_serial_t * const me)
             {
                 EIO_ASSERT_NAME(me->ops->set_tx_state != NULL, me->super.name);
                 me->ops->set_tx_state(me, false);
-                me->sending = true;
             }
+            me->sending = false;
         }
         me->ops->isr_enable(me, true);
         if (flag_send)
@@ -221,6 +221,14 @@ int32_t eio_serial_write(eio_obj_t * const me, const void *buff, uint32_t size)
     {
         buffer->data[buffer->head] = ((uint8_t *)buff)[i];
         buffer->head = (buffer->head + 1) % buffer->size;
+    }
+
+    /* If serial port is sending, send the 1st byte and trigger the tx process. */
+    if (!serial->sending)
+    {
+        serial->sending = true;
+        serial->ops->send(serial, buffer->data[buffer->tail]);
+        buffer->tail = (buffer->tail + 1) % buffer->size;
     }
 
     return size;

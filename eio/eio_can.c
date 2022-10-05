@@ -71,7 +71,7 @@ eio_err_t eio_can_register(eio_can_t * const me,
     me->buff_receive.head = 0;
     me->buff_receive.tail = 0;
 
-    /* Configure CAN port as default and disable the ISR. */
+    /* Configure CAN bus as default and disable the ISR. */
     const eio_can_config_t config_default =
     {
         (uint8_t)EIO_CAN_BAUDRATE_125K,
@@ -84,7 +84,7 @@ eio_err_t eio_can_register(eio_can_t * const me,
     /* Set the ops of the super class. */
     me->super.ops = (struct eio_ops *)&can_ops;
 
-    /* Register the can port to the EIO framwork. */
+    /* Register the CAN bus to the EIO framwork. */
     can_obj_attribute.user_data = attribute->user_data;
     eio_register(&me->super, name, &can_obj_attribute);
 
@@ -140,98 +140,139 @@ void eio_can_isr_send_end(eio_can_t * const me)
 
     while (1)
     {
-
-    }
-}
-
-void eio_can_config(eio_obj_t * dev, eio_can_config_t *config)
-{
-    eio_can_t * can = (eio_can_t *)dev;
-    can->config.baud_rate = config->baud_rate;
-    can->config.mode = config->mode;
-    can->ops->config(can, config);
-}
-
-void eio_can_send(eio_obj_t * dev, const eio_can_msg_t * msg)
-{
-    eio_can_t * can = (eio_can_t *)dev;
-    int ret = m_queue_push(&can->queue_tx, (void *)msg, 1);
-    M_ASSERT_INFO(ret == Queue_OK, "line: %d, ret: %d.", __LINE__, ret);
-}
-
-int eio_can_recv(eio_obj_t * dev, eio_can_msg_t * msg)
-{
-    eio_can_t * can = (eio_can_t *)dev;
-    if (m_queue_empty(&can->queue_rx) == true)
-        return eio_Err_Empty;
-
-    devf_port_irq_disable();
-    int ret = m_queue_pull_pop(&can->queue_rx, msg, 1);
-    devf_port_irq_enable();
-    M_ASSERT_INFO(ret == 1, "line: %d, ret: %d.", __LINE__, ret);
-
-    return eio_OK;
-}
-
-void eio_can_set_evt(eio_obj_t * dev, int evt_recv, int evt_send_end)
-{
-    ((eio_can_t *)dev)->evt_recv = evt_recv;
-    ((eio_can_t *)dev)->evt_send_end = evt_send_end;
-}
-
-void eio_can_add_filter(eio_obj_t * dev, eio_can_filter_t * filter)
-{
-    eio_can_t * can = (eio_can_t *)dev;
-
-    M_ASSERT(can->count_filter >= CAN_FILTER_NUM);
-
-    int i = can->count_filter;
-    can->filter[i].id = filter->id;
-    can->filter[i].mask = filter->mask;
-    can->filter[i].ide = filter->ide;
-    can->filter[i].mode = filter->mode;
-    can->filter[i].rtr = filter->rtr;
-}
-
-void eio_can_config_filter(eio_obj_t * dev)
-{
-    eio_can_t * can = (eio_can_t *)dev;
-    can->ops->config_filter(can);
-}
-
-void eio_can_clear_filter(eio_obj_t * dev)
-{
-    eio_can_t * can = (eio_can_t *)dev;
-    can->count_filter = 0;
-}
-
-// private function ------------------------------------------------------------
-static void eio_can_poll(eio_obj_t * dev, uint64_t time_system_ms)
-{
-    (void)time_system_ms;
-    
-    eio_can_t * can = (eio_can_t *)dev;
-    can->send_busy = can->ops->send_busy(can);
-    if (can->send_busy == true) {
-        return;
-    }
-    
-    eio_can_msg_t msg;
-    int ret;
-    while (m_queue_empty(&can->queue_tx) == false) {
-        ret = m_queue_pull(&can->queue_tx, (void *)&msg, 1);
-        M_ASSERT_INFO(ret == 1, "Can Queue_Tx Pull. Line: %d, ret: %d.", __LINE__, ret);
-        if (can->ops->send(can, &msg) == false) {
+        eio_can_buff_t *buff = &me->buff_send;
+        if (_buff_empty(buff))
+        {
+            me->sending = false;
             break;
         }
-        ret = m_queue_pop(&can->queue_tx, 1);
-        M_ASSERT_INFO(ret == 1, "Can Queue_Tx Pop. Line: %d, ret: %d.", __LINE__, ret);
+
+        /* Get one message from the sending buffer and send it. */
+        me->ops->send(me, &buff->msg[buff->tail]);
+        buff->tail = (buff->tail + 1) % buff->size;
+
+        /* Check the CAN bus is busy. */
+        if (me->ops->send_busy == NULL)
+        {
+            break;
+        }
+        if (me->ops->send_busy(me))
+        {
+            break;
+        }
     }
 }
 
-static eio_err_t eio_can_enable(eio_obj_t * dev, bool enable)
+void eio_can_config(eio_obj_t * const me, eio_can_config_t *config)
 {
-    eio_can_t * can = (eio_can_t *)dev;
+    /* Check the parameters are valid or not. */
+    EIO_ASSERT(me != NULL);
+    EIO_ASSERT_NAME(config != NULL, me->name);
 
-    return can->ops->enable(can, enable);
+    /* CAN type cast. */
+    eio_can_t *can = (eio_can_t *)me;
+    EIO_ASSERT_NAME(can->ops != NULL, me->name);
+    EIO_ASSERT_NAME(can->ops->config != NULL, me->name);
+
+    /* If configurations of CAN bus are changed, */
+    if (memcmp(config, &can->config, sizeof(eio_can_config_t)) != 0)
+    {
+        /* Configure the CAN bus. */
+        can->ops->config(can, config);
+        memcpy(&can->config, config, sizeof(eio_can_config_t));
+    }
 }
+
+void eio_can_send(eio_obj_t * const me, const eio_can_msg_t *msg)
+{
+    /* Check the parameters are valid or not. */
+    EIO_ASSERT(me != NULL);
+    EIO_ASSERT(msg != NULL);
+    
+    /* CAN type cast. */
+    eio_can_t *can = (eio_can_t *)me;
+    EIO_ASSERT_NAME(can->ops != NULL, me->name);
+
+    /* Check the remaining buffer memory space is enough. */
+    eio_can_buff_t *buffer = &can->buff_send;
+    uint16_t remaining = _buff_remaining(buffer);
+    EIO_ASSERT(remaining >= 1);
+
+    /* Put the data into buffer. */
+    buffer->msg[buffer->head] = *msg;
+    buffer->head = (buffer->head + 1) % buffer->size;
+
+    /* If not sending, send the 1st message. */
+    if (!can->sending)
+    {
+        eio_can_isr_send_end(can);
+    }
+}
+
+bool eio_can_receive(eio_obj_t * const me, eio_can_msg_t *msg)
+{
+    bool ret = false;
+
+    /* Check the parameters are valid or not. */
+    EIO_ASSERT(me != NULL);
+    EIO_ASSERT(msg != NULL);
+
+    /* CAN type cast. */
+    eio_can_t *can = (eio_can_t *)me;
+    EIO_ASSERT_NAME(can->ops != NULL, me->name);
+
+    /* Check the remaining buffer memory space is enough. */
+    eio_can_buff_t *buffer = &can->buff_receive;
+
+    /* Calculate the return size and get data. */
+    ret = !_buff_empty(buffer);
+    if (ret)
+    {
+        /* Get the data from buffer. */
+        *msg = buffer->msg[buffer->tail];
+        buffer->tail = (buffer->tail + 1) % buffer->size;
+    }
+
+    return ret;
+}
+
+eio_err_t eio_can_config_filter(eio_obj_t * const me, eio_can_filter_t *filter)
+{
+    eio_err_t ret = EIO_OK;
+
+    /* Check the parameters are valid or not. */
+    EIO_ASSERT(me != NULL);
+    EIO_ASSERT(filter != NULL);
+
+    /* CAN type cast. */
+    eio_can_t *can = (eio_can_t *)me;
+    EIO_ASSERT_NAME(can->ops != NULL, me->name);
+
+    /* Set the hardware CAN filter. */
+    if (can->ops->config_filter != NULL)
+    {
+        ret = can->ops->config_filter(can, filter);
+    }
+
+    /* Add to the list. */
+    if (ret == EIO_OK)
+    {
+        filter->next = can->filter_list;
+        can->filter_list = filter;
+    }
+
+    return ret;
+}
+
+/* private function --------------------------------------------------------- */
+static uint8_t _buff_remaining(eio_can_buff_t * const buff)
+{
+    return 0;
+}
+
+static bool _buff_empty(eio_can_buff_t * const buff)
+{
+    return 0;
+}
+
+/* ----------------------------- end of file -------------------------------- */
