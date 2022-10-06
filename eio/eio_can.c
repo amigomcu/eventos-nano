@@ -15,11 +15,20 @@
 
 /* include ------------------------------------------------------------------ */
 #include "eio_can.h"
+#include <string.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* private function prototype ----------------------------------------------- */
 /* Interface functions. */
 static eio_err_t _can_open(eio_obj_t * const me);
 static eio_err_t _can_close(eio_obj_t * const me);
+static int32_t _can_read(eio_obj_t * const me,
+                            uint32_t pos, void *buff, uint32_t size);
+static int32_t _can_write(eio_obj_t * const me,
+                            uint32_t pos, const void *buff, uint32_t size);
 
 /* static function related with buffer. */
 static uint8_t _buff_remaining(eio_can_buff_t * const buff);
@@ -30,14 +39,15 @@ static bool _buff_empty(eio_can_buff_t * const buff);
 extern void eio_register(eio_obj_t * const me,
                             const char *name,
                             eio_obj_attribute_t *attribute);
+extern void eio_callback_function_null(eio_obj_t * const me);
 
 /* private variables -------------------------------------------------------- */
 static const struct eio_ops can_ops =
 {
     _can_open,
     _can_close,
-    NULL,
-    NULL,
+    _can_read,
+    _can_write,
     NULL,
 };
 
@@ -77,7 +87,7 @@ eio_err_t eio_can_register(eio_can_t * const me,
         (uint8_t)EIO_CAN_BAUDRATE_125K,
         (uint8_t)EIO_CAN_MODE_NORMAL,
     };
-    me->ops->config(me, &config_default);
+    me->ops->config(me, (eio_can_config_t *)&config_default);
     me->config = config_default;
     me->ops->isr_enable(me, false);
 
@@ -87,6 +97,19 @@ eio_err_t eio_can_register(eio_can_t * const me,
     /* Register the CAN bus to the EIO framwork. */
     can_obj_attribute.user_data = attribute->user_data;
     eio_register(&me->super, name, &can_obj_attribute);
+
+    /* Register events to the CAN bus object. */
+    for (uint8_t i = 0; i < EIO_CAN_EVT_MAX; i ++)
+    {
+        me->events[i].next = NULL;
+#if (EIO_EVENT_MODE == 0)
+        me->events[i].e_topic = 0;
+#else
+        me->events[i].callback = eio_callback_function_null;
+        me->events[i].eio_event_id = i;
+#endif
+        eio_attach_event(&me->super, &me->events[i]);
+    }
 
     return EIO_OK;
 }
@@ -274,5 +297,66 @@ static bool _buff_empty(eio_can_buff_t * const buff)
 {
     return 0;
 }
+
+static eio_err_t _can_enable(eio_obj_t * const me, bool status)
+{
+    /* can type cast. */
+    eio_can_t *can = (eio_can_t *)me;
+    EIO_ASSERT_NAME(can->ops != NULL, me->name);
+    EIO_ASSERT_NAME(can->ops->isr_enable != NULL, me->name);
+
+    /* Enable the interrupt. */
+    can->ops->isr_enable(can, status);
+
+    return EIO_OK;
+}
+
+static eio_err_t _can_open(eio_obj_t * const me)
+{
+    return _can_enable(me, true);
+}
+
+static eio_err_t _can_close(eio_obj_t * const me)
+{
+    return _can_enable(me, false);
+}
+
+static int32_t _can_read(eio_obj_t * const me,
+                            uint32_t pos, void *buff, uint32_t size)
+{
+    (void)pos;
+
+    /* Check the parameters are valid or not. */
+    EIO_ASSERT_NAME((size % sizeof(eio_can_msg_t)) == 0, me->name);
+    EIO_ASSERT_NAME(size != 0, me->name);
+    
+    for (uint32_t i = 0; i < (size / sizeof(eio_can_msg_t)); i ++)
+    {
+        eio_can_receive(me, (buff + sizeof(eio_can_msg_t) * i));
+    }
+    
+    return size;
+}
+
+static int32_t _can_write(eio_obj_t * const me,
+                            uint32_t pos, const void *buff, uint32_t size)
+{
+    (void)pos;
+
+    /* Check the parameters are valid or not. */
+    EIO_ASSERT_NAME((size % sizeof(eio_can_msg_t)) == 0, me->name);
+    EIO_ASSERT_NAME(size != 0, me->name);
+    
+    for (uint32_t i = 0; i < (size / sizeof(eio_can_msg_t)); i ++)
+    {
+        eio_can_send(me, (buff + sizeof(eio_can_msg_t) * i));
+    }
+    
+    return size;
+}
+
+#ifdef __cplusplus
+}
+#endif
 
 /* ----------------------------- end of file -------------------------------- */

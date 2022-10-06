@@ -23,7 +23,18 @@
 extern "C" {
 #endif
 
+/* public config ------------------------------------------------------------ */
+#define EIO_PIN_FILTER_DEPTH                    (3)
+
 /* public define ------------------------------------------------------------ */
+enum
+{
+    EIO_PIN_EVT_HIGH_EDGE = 0,
+    EIO_PIN_EVT_LOW_EDGE,
+
+    EIO_PIN_EVT_MAX
+};
+
 enum
 {
     EIO_PIN_MODE_OUT_OD = 0,
@@ -43,13 +54,17 @@ typedef struct eio_pin_attribute
     uint8_t status_default;
 } eio_pin_attribute_t;
 
-typedef struct eio_pin_tag
+typedef struct eio_pin
 {
     eio_obj_t super;
     const struct eio_pin_ops *ops;
 
+    bool status_filter[EIO_PIN_FILTER_DEPTH];
+    uint8_t index_filter;
     bool status;
+    bool status_backup;
     uint8_t mode;
+    eio_event_t events[EIO_PIN_EVT_MAX];
 } eio_pin_t;
 
 struct eio_pin_ops

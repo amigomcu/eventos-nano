@@ -59,6 +59,7 @@ enum eio_type
     EIO_TYPE_PIN = 0,
     EIO_TYPE_SERIAL,
     EIO_TYPE_RTC,
+    EIO_TYPE_UID,
     EIO_TYPE_AIN,
     EIO_TYPE_AOUT,
     EIO_TYPE_PWM,
@@ -76,19 +77,19 @@ enum eio_type
 
 typedef enum eio_err_tag
 {
-    EIO_OK              = 0,            /* There is no error */
-    EIO_ERROR           = -1,           /* A generic error happens */
-    EIO_ERR_TIMEOUT     = -2,           /* Timed out */
-    EIO_ERR_FULL        = -3,           /* The resource is full */
-    EIO_ERR_EMPTY       = -4,           /* The resource is empty */
-    EIO_ERR_BUSY        = -5,           /* Busy */
-    EIO_ERR_WrongArg    = -6,           /* Wrong Arguments */
-    EIO_ERR_WRONG_CMD   = -7,           /* Wrong Cmd */
-    EIO_ERR_EndlessLoop = -8,           /* Endless Loop */
-    EIO_ERR_REPEATED    = -9,           /* Repeated */
-    EIO_ERR_NonExistent = -10,          /* Not existent */
-    EIO_ERR_DISABLED    = -11,          /* Disabled */
-    EIO_ERR_OPEN_FAIL   = -12,          /* Opening failure */
+    EIO_OK                  = 0,        /* There is no error */
+    EIO_ERROR               = -1,       /* A generic error happens */
+    EIO_ERR_TIMEOUT         = -2,       /* Timed out */
+    EIO_ERR_FULL            = -3,       /* The resource is full */
+    EIO_ERR_EMPTY           = -4,       /* The resource is empty */
+    EIO_ERR_BUSY            = -5,       /* Busy */
+    EIO_ERR_WRONG_ARG       = -6,       /* Wrong Arguments */
+    EIO_ERR_WRONG_CMD       = -7,       /* Wrong Cmd */
+    EIO_ERR_ENDLESS_LOOP    = -8,       /* Endless Loop */
+    EIO_ERR_REPEATED        = -9,       /* Repeated */
+    EIO_ERR_NOT_EXISTENT    = -10,      /* Not existent */
+    EIO_ERR_DISABLED        = -11,      /* Disabled */
+    EIO_ERR_OPEN_FAIL       = -12,      /* Opening failure */
 } eio_err_t;
 
 /* public typedef ----------------------------------------------------------- */
@@ -156,6 +157,7 @@ void eio_poll(uint8_t rt_level);
 eio_obj_t *eio_find(const char *name);
 
 /* Event related functions. */
+bool eio_event_list_empty(eio_obj_t * const me);
 void eio_attach_event(eio_obj_t * const me, eio_event_t *e);
 void eio_event_publish(eio_obj_t * const me, uint8_t eio_event_id);
 #if (EIO_EVENT_MODE == 0)
@@ -173,8 +175,8 @@ eio_err_t eio_close(eio_obj_t * const me);
 int32_t eio_read(eio_obj_t *me, uint32_t pos, void *buff, uint32_t size);
 int32_t eio_write(eio_obj_t *me, uint32_t pos, const void *buff, uint32_t size);
 
-/* EIO general functions. */
-void eio_get_time(eio_time_t *time);
+/* EIO time functions. */
+void eio_get_time(uint8_t rt_level, eio_time_t *time);
 uint32_t eio_time_diff_ms(eio_time_t *time_current, eio_time_t *time_last);
 uint32_t eio_time_diff_us(eio_time_t *time_current, eio_time_t *time_last);
 

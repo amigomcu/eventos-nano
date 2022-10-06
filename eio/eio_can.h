@@ -28,7 +28,7 @@ enum
 {
     EIO_CAN_EVT_MESSAGE_RECEIVED = 0,
 
-    EIO_SERIAL_EVT_MAX
+    EIO_CAN_EVT_MAX
 };
 
 enum
@@ -108,6 +108,7 @@ typedef struct eio_can
     eio_can_config_t config;
     eio_can_filter_t *filter_list;
     bool sending;
+    eio_event_t events[EIO_CAN_EVT_MAX];
 } eio_can_t;
 
 struct eio_can_ops

@@ -16,6 +16,7 @@
 /* include ------------------------------------------------------------------ */
 #include "eio.h"
 #include "eio_serial.h"
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,10 @@ extern "C" {
 /* Interface functions. */
 static eio_err_t _serial_open(eio_obj_t * const me);
 static eio_err_t _serial_close(eio_obj_t * const me);
+static int32_t _serial_read(eio_obj_t * const me,
+                            uint32_t pos, void *buff, uint32_t size);
+static int32_t _serial_write(eio_obj_t * const me,
+                                uint32_t pos, const void *buff, uint32_t size);
 static void _serial_poll(eio_obj_t * const me);
 
 /* static function related with buffer. */
@@ -40,14 +45,15 @@ static void _set_threshold_t15_t35(eio_serial_t * const me,
 extern void eio_register(eio_obj_t * const me,
                             const char *name,
                             eio_obj_attribute_t *attribute);
+extern void eio_callback_function_null(eio_obj_t * const me);
 
 /* private variables -------------------------------------------------------- */
 static const struct eio_ops serial_ops =
 {
     _serial_open,
     _serial_close,
-    NULL,
-    NULL,
+    _serial_read,
+    _serial_write,
     _serial_poll,
 };
 
@@ -101,6 +107,19 @@ eio_err_t eio_serial_register(eio_serial_t * const me,
     serial_obj_attribute.user_data = attribute->user_data;
     eio_register(&me->super, name, &serial_obj_attribute);
 
+    /* Register events to the serial port object. */
+    for (uint8_t i = 0; i < EIO_SERIAL_EVT_MAX; i ++)
+    {
+        me->events[i].next = NULL;
+#if (EIO_EVENT_MODE == 0)
+        me->events[i].e_topic = 0;
+#else
+        me->events[i].callback = eio_callback_function_null;
+        me->events[i].eio_event_id = i;
+#endif
+        eio_attach_event(&me->super, &me->events[i]);
+    }
+
     return EIO_OK;
 }
 
@@ -123,7 +142,7 @@ void eio_serial_isr_receive(eio_serial_t * const me, uint8_t byte)
         me->ops->isr_enable(me, true);
 
         /* Update the receiving time. */
-        eio_get_time(&me->time_receive);
+        eio_get_time(serial_obj_attribute.rt_level, &me->time_receive);
         me->event_t15_sent = false;
         me->event_t35_sent = false;
     }
@@ -323,6 +342,22 @@ static eio_err_t _serial_close(eio_obj_t * const me)
     return _serial_enable(me, false);
 }
 
+static int32_t _serial_read(eio_obj_t * const me,
+                            uint32_t pos, void *buff, uint32_t size)
+{
+    (void)pos;
+
+    return eio_serial_read(me, buff, size);
+}
+
+static int32_t _serial_write(eio_obj_t * const me,
+                                uint32_t pos, const void *buff, uint32_t size)
+{
+    (void)pos;
+
+    return eio_serial_write(me, buff, size);
+}
+
 static void _serial_poll(eio_obj_t * const me)
 {
     /* Serial type cast. */
@@ -336,7 +371,7 @@ static void _serial_poll(eio_obj_t * const me)
         uint32_t time_diff;
         if (!_buff_empty(&serial->buff_rx))
         {
-            eio_get_time(&time_current);
+            eio_get_time(serial_obj_attribute.rt_level, &time_current);
             time_diff = eio_time_diff_us(&time_current, &serial->time_receive);
             if (time_diff >= serial->threshold_t15 && !serial->event_t15_sent)
             {

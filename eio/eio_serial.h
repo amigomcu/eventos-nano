@@ -97,6 +97,7 @@ typedef struct eio_serial
     uint32_t threshold_t15;
     bool event_t35_sent;
     bool event_t15_sent;
+    eio_event_t events[EIO_SERIAL_EVT_MAX];
 
     /* Only for RS485 mode. */
     bool rs485;

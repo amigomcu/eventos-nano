@@ -28,30 +28,42 @@ extern "C" {
 /* private typedef ---------------------------------------------------------- */
 static eio_obj_t *list[EIO_RT_LEVEL_MAX] =
 {
-    NULL, NULL,
+    NULL, NULL, NULL, NULL,
 };
-static uint32_t time_eio_ms = UINT32_MAX;
-static uint16_t time_eio_us = UINT16_MAX;
+static eio_time_t time[EIO_RT_LEVEL_MAX] =
+{
+    { UINT32_MAX, UINT16_MAX },
+    { UINT32_MAX, UINT16_MAX },
+    { UINT32_MAX, UINT16_MAX },
+    { UINT32_MAX, UINT16_MAX },
+};
 
 /* public function ---------------------------------------------------------- */
+void eio_callback_function_null(eio_obj_t * const me)
+{
+    (void)me;
+
+    /* Do nothing. */
+}
+
 void eio_poll(uint8_t rt_level)
 {
     /* Check the parameters are valid. */
     EIO_ASSERT(rt_level < EIO_RT_LEVEL_MAX);
 
     /* Get the time for the 1st time. */
-    if (time_eio_ms == UINT32_MAX)
+    if (time[rt_level].ms == UINT32_MAX)
     {
-        time_eio_ms = eio_port_system_time();
+        time[rt_level].ms = eio_port_system_time();
         return;
     }
 
     /* Time adjusting, and clear us-level time counting. */
-    if (rt_level == EIO_RT_LEVEL_US && time_eio_us == UINT16_MAX)
+    if (rt_level > EIO_RT_LEVEL_MS && time[rt_level].us == UINT16_MAX)
     {
-        if (time_eio_ms != eio_port_system_time())
+        if (time[rt_level].ms != eio_port_system_time())
         {
-            time_eio_us = 0;
+            time[rt_level].us = 0;
         }
         else
         {
@@ -62,8 +74,8 @@ void eio_poll(uint8_t rt_level)
     /* The non-realtime polling is executed while time_ms changes. */
     /* The beginning section of time is ignored. */
     if (rt_level == EIO_RT_LEVEL_MS &&
-        (time_eio_ms == eio_port_system_time()) ||
-        (time_eio_ms <= EIO_TIME_START_IGNORE))
+        (time[rt_level].ms == eio_port_system_time()) ||
+        (time[rt_level].ms <= EIO_TIME_START_IGNORE))
     {
         return;
     }
@@ -173,6 +185,21 @@ void eio_attach_event(eio_obj_t * const me, eio_event_t *e)
 
     /* Enable the interrupt of the polling timer ISR. */
     eio_port_rt_isr_enable(me->attribute.rt_level, true);
+}
+
+bool eio_event_list_empty(eio_obj_t * const me)
+{
+    /* Check the parameters are valid. */
+    EIO_ASSERT(me != NULL);
+
+    bool ret = false;
+
+    if (me->elist == NULL)
+    {
+        ret = true;
+    }
+
+    return ret;
 }
 
 void eio_event_publish(eio_obj_t * const me, uint8_t eio_event_id)
@@ -336,10 +363,10 @@ int32_t eio_write(eio_obj_t *me, uint32_t pos, const void *buff, uint32_t size)
     return ret;
 }
 
-void eio_get_time(eio_time_t *time)
+void eio_get_time(uint8_t rt_level, eio_time_t *time)
 {
-    time->ms = time_eio_ms;
-    time->us = time_eio_us;
+    time->ms = time[rt_level].ms;
+    time->us = time[rt_level].us;
 }
 
 uint32_t eio_time_diff_ms(eio_time_t *time_current, eio_time_t *time_last)
