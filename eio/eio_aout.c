@@ -20,10 +20,6 @@
 extern "C" {
 #endif
 
-/* private function prototype ----------------------------------------------- */
-/* Interface functions. */
-static void _aout_poll(eio_obj_t * const me);
-
 /* public function prototype ------------------------------------------------ */
 /* extern function in EIO framework. */
 extern void eio_register(eio_obj_t * const me,
@@ -31,9 +27,9 @@ extern void eio_register(eio_obj_t * const me,
                             eio_obj_attribute_t *attribute);
 
 /* private variables -------------------------------------------------------- */
-static eio_obj_attribute_t pin_obj_attribute =
+static eio_obj_attribute_t aout_obj_attribute =
 {
-    0, EIO_TYPE_PIN, EIO_RT_LEVEL_100US, NULL
+    0, EIO_TYPE_AOUT, EIO_RT_LEVEL_100US, NULL
 };
 
 /* public function ---------------------------------------------------------- */
@@ -56,8 +52,8 @@ eio_err_t eio_aout_register(eio_aout_t * const me,
 
     /* Register the Analog Output object to the EIO framwork. */
     me->super.ops = NULL;
-    pin_obj_attribute.user_data = attribute->user_data;
-    eio_register(&me->super, name, &pin_obj_attribute);
+    aout_obj_attribute.user_data = attribute->user_data;
+    eio_register(&me->super, name, &aout_obj_attribute);
 
     return EIO_OK;
 }

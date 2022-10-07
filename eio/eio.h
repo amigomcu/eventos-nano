@@ -58,8 +58,6 @@ enum eio_type
 {
     EIO_TYPE_PIN = 0,
     EIO_TYPE_SERIAL,
-    EIO_TYPE_RTC,
-    EIO_TYPE_UID,
     EIO_TYPE_AIN,
     EIO_TYPE_AOUT,
     EIO_TYPE_PWM,

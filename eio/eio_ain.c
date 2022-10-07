@@ -42,7 +42,7 @@ static const struct eio_ops ain_ops =
 
 static eio_obj_attribute_t pin_obj_attribute =
 {
-    0, EIO_TYPE_PIN, EIO_RT_LEVEL_100US, NULL
+    0, EIO_TYPE_AIN, EIO_RT_LEVEL_100US, NULL
 };
 
 /* public function ---------------------------------------------------------- */
